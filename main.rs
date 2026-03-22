@@ -47,11 +47,12 @@ fn pixel_division(triangle: &Vec<Value2d>, px: i32, py: i32, s: i16) -> f32 {
     let mut color_intensity: f32 = 0.0;
     let total_samples = (s * s) as f32;
     let step = 1.0 / s as f32;
-    let start = (px as f32) - 0.5;
+    let start_x = (px as f32) - 0.5;
+    let start_y = (py as f32) - 0.5;
     for sy in 0..s {
         for sx in 0..s {
-            let sub_x = start + (sx as f32 * step) + (step / 2.0);
-            let sub_y = start + (sy as f32 * step) + (step / 2.0);
+            let sub_x = start_x + (sx as f32 * step) + (step / 2.0);
+            let sub_y = start_y + (sy as f32 * step) + (step / 2.0);
 
             if point_in_triangle(triangle, (sub_x as f64, sub_y as f64)) {
                 color_intensity += 1.0 / total_samples;
