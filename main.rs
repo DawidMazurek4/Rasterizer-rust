@@ -13,6 +13,7 @@ struct Object3d{
     vertexs:Vec<(f64,f64,f64)>,
     triangles:Vec<(i32,i32,i32)>,
     position:(f64,f64,f64),
+    rotation:(f64,f64,f64),
     scale:(f64,f64,f64),
     color:Pixel,
 }
@@ -23,16 +24,29 @@ impl Object3d {
         let fov_rad = (FOV as f64).to_radians();
         let aspect_ratio = SCREEN_SIZE.0 as f64 / SCREEN_SIZE.1 as f64;
 
-        for &(x3d, y3d, z3d) in &self.vertexs {
-            let z = z3d * self.scale.2 + self.position.2;
+        for &(mut x3d, mut y3d, mut z3d) in &self.vertexs {
+            x3d *= self.scale.0;
+            y3d *= self.scale.1;
+            z3d *= self.scale.2;
+
+            let dx = x3d - self.position.0;
+            let dy = y3d - self.position.1;
+
+            let cos = self.rotation.0.to_radians().cos();
+            let sin = self.rotation.0.to_radians().sin();
+
+            x3d = self.position.0 + dx * cos - dy * sin;
+            y3d = self.position.1 + dx * sin + dy * cos;
+
+            let z = z3d + self.position.2;
 
             if z <= 0.1 { // unikamy dzielenia przez 0
                 vertexs_normalized.push((0.0,0.0));
                 continue;
             }
 
-            let x = (x3d * self.scale.0 + self.position.0) / (z * (fov_rad / 2.0).tan());
-            let y = (y3d * self.scale.1 + self.position.1) / (z * (fov_rad / 2.0).tan());
+            let x = (x3d) / (z * (fov_rad / 2.0).tan());
+            let y = (y3d) / (z * (fov_rad / 2.0).tan());
 
             // normalizacja do ekranu
             let screen_x = ((x * aspect_ratio + 1.0) * 0.5 * SCREEN_SIZE.0 as f64);
@@ -152,9 +166,10 @@ fn main(){
                 // prawo
                 (1, 2, 6), (1, 6, 5),
             ],
-            position: (2000.0,2000.0,30000.0),
+            position: (100.0,100.0,20000.0),
             scale: (10000.0,10000.0,10000.0),
-            color: (255,255,1,),
+            rotation: (0.0,0.0,0.0),
+            color: (255,0,0),
         };
     DrawObject(&mut pixels, &cube);
     save_ppm(&pixels);
