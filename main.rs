@@ -17,6 +17,22 @@ struct Object3d{
     scale:(f64,f64,f64),
     color:Pixel,
 }
+fn calculate_3d_rotation_matrix(rotation:&(f64,f64,f64), position:(f64,f64,f64)) -> (f64,f64,f64){
+    let mut pos_ret:(f64,f64,f64) = position;
+
+    let cosa = rotation.0.to_radians().cos();
+    let cosb = rotation.1.to_radians().cos();
+    let cosy = rotation.2.to_radians().cos();
+
+    let sina = rotation.0.to_radians().sin();
+    let sinb = rotation.1.to_radians().sin();
+    let siny = rotation.2.to_radians().sin();
+    pos_ret.0 = (position.0 * (cosb * cosy) + position.1 *((sina * sinb * cosy) - (cosa * siny)) + position.2 * ((cosa * sinb * cosy) + (sina * siny)));
+    pos_ret.1 = (position.0 * (cosb * siny) + position.1 *((sina * sinb * siny) + (cosa * cosy)) + position.2 * ((cosa * sinb * siny) - (sina * cosy)));
+    pos_ret.2 = (position.0 * (-sinb) + position.1 *(sina * cosb) + position.2 * (cosa * cosb));
+
+    return pos_ret;
+}
 
 impl Object3d {
     fn normalize(&self) -> Vec<(f64,f64)> {
@@ -25,19 +41,17 @@ impl Object3d {
         let aspect_ratio = SCREEN_SIZE.0 as f64 / SCREEN_SIZE.1 as f64;
 
         for &(mut x3d, mut y3d, mut z3d) in &self.vertexs {
+            
+            
+            (x3d,y3d,z3d) = calculate_3d_rotation_matrix(&self.rotation, (x3d,y3d,z3d));
+
+            x3d += self.position.0;
+            y3d += self.position.1;
             x3d *= self.scale.0;
             y3d *= self.scale.1;
             z3d *= self.scale.2;
 
-            let dx = x3d - self.position.0;
-            let dy = y3d - self.position.1;
-
-            let cos = self.rotation.0.to_radians().cos();
-            let sin = self.rotation.0.to_radians().sin();
-
-            x3d = self.position.0 + dx * cos - dy * sin;
-            y3d = self.position.1 + dx * sin + dy * cos;
-
+            
             let z = z3d + self.position.2;
 
             if z <= 0.1 { // unikamy dzielenia przez 0
@@ -137,10 +151,10 @@ fn main(){
 
     let cube:Object3d =  Object3d{
         vertexs: vec![
-            (-1.0, -1.0, 0.0), // 0
-            ( 1.0, -1.0, 0.0), // 1
-            ( 1.0,  1.0, 0.0), // 2
-            (-1.0,  1.0, 0.0), // 3
+            (-1.0, -1.0, -1.0), // 0
+            ( 1.0, -1.0, -1.0), // 1
+            ( 1.0,  1.0, -1.0), // 2
+            (-1.0,  1.0, -1.0), // 3
             (-1.0, -1.0,  1.0), // 4
             ( 1.0, -1.0,  1.0), // 5
             ( 1.0,  1.0,  1.0), // 6
@@ -166,9 +180,9 @@ fn main(){
                 // prawo
                 (1, 2, 6), (1, 6, 5),
             ],
-            position: (100.0,100.0,20000.0),
-            scale: (10000.0,10000.0,10000.0),
-            rotation: (0.0,0.0,0.0),
+            position: (1.0,1.0,22.0),
+            scale: (5.0,5.0,5.0),
+            rotation: (90.0,20.0,120.0),
             color: (255,0,0),
         };
     DrawObject(&mut pixels, &cube);
