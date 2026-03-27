@@ -73,9 +73,9 @@ impl Object3d {
     }
 }
 
-fn save_ppm(pixels: &Vec<Pixel>){ // saves vector of (u8,u8,u8) to a ppm file
+fn save_ppm(pixels: &Vec<Pixel>, name:String){ // saves vector of (u8,u8,u8) to a ppm file
     println!("save_ppm"); 
-    let mut file = File::create("plik.ppm").unwrap();
+    let mut file = File::create(name).unwrap();
     file.write_all(format!("P3\n{} {}\n255\n",SCREEN_SIZE.0,SCREEN_SIZE.1).as_bytes()).unwrap();
 
     for i in 0..pixels.len(){
@@ -115,11 +115,29 @@ fn point_in_triangle(triangle: &Vec<(f64,f64)>, point: (f64,f64)) -> bool{ // ch
 fn DrawTriangle(pixels: &mut Vec<Pixel>, triangle: &Vec<(f64,f64)>,color: Pixel){ // drawing a
                                                                                 // triangle
     // finding max and min values for minimum amount of iterations
-    let MaxX = cmp::max(triangle[0].0 as i32, cmp::max(triangle[1].0 as i32, triangle[2].0 as i32))as i32;
-    let MaxY = cmp::max(triangle[0].1 as i32, cmp::max(triangle[1].1 as i32, triangle[2].1 as i32))as i32;
-    let MinX = cmp::min(triangle[0].0 as i32, cmp::min(triangle[1].0 as i32, triangle[2].0 as i32))as i32;
-    let MinY = cmp::min(triangle[0].1 as i32, cmp::min(triangle[1].1 as i32, triangle[2].1 as i32))as i32;
+    let mut MaxX = cmp::max(triangle[0].0 as i32, cmp::max(triangle[1].0 as i32, triangle[2].0 as i32))as i32;
+    let mut MaxY = cmp::max(triangle[0].1 as i32, cmp::max(triangle[1].1 as i32, triangle[2].1 as i32))as i32;
+    let mut MinX = cmp::min(triangle[0].0 as i32, cmp::min(triangle[1].0 as i32, triangle[2].0 as i32))as i32;
+    let mut MinY = cmp::min(triangle[0].1 as i32, cmp::min(triangle[1].1 as i32, triangle[2].1 as i32))as i32;
     let mut triangle_to_draw:Vec<(i32,i32,f32)> = vec![];
+    
+    if MaxX < 0 || MinX > SCREEN_SIZE.0 || MaxY < 0 || MinY > SCREEN_SIZE.1{
+        return;
+    }
+
+    if MaxX > SCREEN_SIZE.0{
+        MaxX = SCREEN_SIZE.0
+    }
+    if MaxY > SCREEN_SIZE.1{
+        MaxY = SCREEN_SIZE.1;
+    }
+    if MinX < 0{
+        MinX = 0;
+    }
+    if MinY < 0{
+        MinY = 0;
+    }
+    
     for i in MinY..MaxY{
         for j in MinX..MaxX{
             if  point_in_triangle(triangle, (j as f64, i as f64)){
@@ -149,7 +167,7 @@ fn main(){
 
 
 
-    let cube:Object3d =  Object3d{
+    let mut cube:Object3d =  Object3d{
         vertexs: vec![
             (-1.0, -1.0, -1.0), // 0
             ( 1.0, -1.0, -1.0), // 1
@@ -180,11 +198,12 @@ fn main(){
                 // prawo
                 (1, 2, 6), (1, 6, 5),
             ],
-            position: (1.0,1.0,22.0),
+            position: (0.8,1.0,22.0),
             scale: (5.0,5.0,5.0),
-            rotation: (90.0,20.0,120.0),
+            rotation: (0.0,0.0,0.0),
             color: (255,0,0),
         };
     DrawObject(&mut pixels, &cube);
-    save_ppm(&pixels);
+    save_ppm(&pixels, "plik.ppm".to_string())
+    
 }
