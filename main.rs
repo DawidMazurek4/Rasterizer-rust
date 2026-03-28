@@ -2,8 +2,7 @@ use std::fs::File;
 use std::io::Write;
 use std::cmp;
 
-type Value3d = (i32, i32, i32);
-type Value2d = (i32, i32);
+
 type Pixel = (u8,u8,u8);
 const SCREEN_SIZE:(i32, i32) = (500,500);
 const FOV:f64 = 90.0;
@@ -27,9 +26,9 @@ fn calculate_3d_rotation_matrix(rotation:&(f64,f64,f64), position:(f64,f64,f64))
     let sina = rotation.0.to_radians().sin();
     let sinb = rotation.1.to_radians().sin();
     let siny = rotation.2.to_radians().sin();
-    pos_ret.0 = (position.0 * (cosb * cosy) + position.1 *((sina * sinb * cosy) - (cosa * siny)) + position.2 * ((cosa * sinb * cosy) + (sina * siny)));
-    pos_ret.1 = (position.0 * (cosb * siny) + position.1 *((sina * sinb * siny) + (cosa * cosy)) + position.2 * ((cosa * sinb * siny) - (sina * cosy)));
-    pos_ret.2 = (position.0 * (-sinb) + position.1 *(sina * cosb) + position.2 * (cosa * cosb));
+    pos_ret.0 = position.0 * (cosb * cosy) + position.1 *((sina * sinb * cosy) - (cosa * siny)) + position.2 * ((cosa * sinb * cosy) + (sina * siny));
+    pos_ret.1 = position.0 * (cosb * siny) + position.1 *((sina * sinb * siny) + (cosa * cosy)) + position.2 * ((cosa * sinb * siny) - (sina * cosy));
+    pos_ret.2 = position.0 * -sinb + position.1 *(sina * cosb) + position.2 * (cosa * cosb);
 
     return pos_ret;
 }
@@ -59,12 +58,12 @@ impl Object3d {
                 continue;
             }
 
-            let x = (x3d) / (z * (fov_rad / 2.0).tan());
-            let y = (y3d) / (z * (fov_rad / 2.0).tan());
+            let x = x3d / (z * (fov_rad / 2.0).tan());
+            let y = y3d / (z * (fov_rad / 2.0).tan());
 
             // normalizacja do ekranu
-            let screen_x = ((x * aspect_ratio + 1.0) * 0.5 * SCREEN_SIZE.0 as f64);
-            let screen_y = ((1.0 - (y + 1.0) * 0.5) * SCREEN_SIZE.1 as f64);
+            let screen_x = (x * aspect_ratio + 1.0) * 0.5 * SCREEN_SIZE.0 as f64;
+            let screen_y = (1.0 - (y + 1.0) * 0.5) * SCREEN_SIZE.1 as f64;
 
             vertexs_normalized.push((screen_x, screen_y));
         }
@@ -112,34 +111,34 @@ fn point_in_triangle(triangle: &Vec<(f64,f64)>, point: (f64,f64)) -> bool{ // ch
 
 
 
-fn DrawTriangle(pixels: &mut Vec<Pixel>, triangle: &Vec<(f64,f64)>,color: Pixel){ // drawing a
+fn draw_triangle(pixels: &mut Vec<Pixel>, triangle: &Vec<(f64,f64)>,color: Pixel){ // drawing a
                                                                                 // triangle
     // finding max and min values for minimum amount of iterations
-    let mut MaxX = cmp::max(triangle[0].0 as i32, cmp::max(triangle[1].0 as i32, triangle[2].0 as i32))as i32;
-    let mut MaxY = cmp::max(triangle[0].1 as i32, cmp::max(triangle[1].1 as i32, triangle[2].1 as i32))as i32;
-    let mut MinX = cmp::min(triangle[0].0 as i32, cmp::min(triangle[1].0 as i32, triangle[2].0 as i32))as i32;
-    let mut MinY = cmp::min(triangle[0].1 as i32, cmp::min(triangle[1].1 as i32, triangle[2].1 as i32))as i32;
+    let mut max_x = cmp::max(triangle[0].0 as i32, cmp::max(triangle[1].0 as i32, triangle[2].0 as i32))as i32;
+    let mut max_y = cmp::max(triangle[0].1 as i32, cmp::max(triangle[1].1 as i32, triangle[2].1 as i32))as i32;
+    let mut min_x = cmp::min(triangle[0].0 as i32, cmp::min(triangle[1].0 as i32, triangle[2].0 as i32))as i32;
+    let mut min_y = cmp::min(triangle[0].1 as i32, cmp::min(triangle[1].1 as i32, triangle[2].1 as i32))as i32;
     let mut triangle_to_draw:Vec<(i32,i32,f32)> = vec![];
     
-    if MaxX < 0 || MinX > SCREEN_SIZE.0 || MaxY < 0 || MinY > SCREEN_SIZE.1{
+    if max_x < 0 || min_x > SCREEN_SIZE.0 || max_y < 0 || min_y > SCREEN_SIZE.1{
         return;
     }
 
-    if MaxX > SCREEN_SIZE.0{
-        MaxX = SCREEN_SIZE.0
+    if max_x > SCREEN_SIZE.0{
+        max_x = SCREEN_SIZE.0
     }
-    if MaxY > SCREEN_SIZE.1{
-        MaxY = SCREEN_SIZE.1;
+    if max_y > SCREEN_SIZE.1{
+        max_y = SCREEN_SIZE.1;
     }
-    if MinX < 0{
-        MinX = 0;
+    if min_x < 0{
+        min_x = 0;
     }
-    if MinY < 0{
-        MinY = 0;
+    if min_y < 0{
+        min_y = 0;
     }
     
-    for i in MinY..MaxY{
-        for j in MinX..MaxX{
+    for i in min_y..max_y{
+        for j in min_x..max_x{
             if  point_in_triangle(triangle, (j as f64, i as f64)){
                 triangle_to_draw.push((j,i,1.0));
             }
@@ -149,7 +148,7 @@ fn DrawTriangle(pixels: &mut Vec<Pixel>, triangle: &Vec<(f64,f64)>,color: Pixel)
     put_pixels(pixels, triangle_to_draw,color);
     
 }
-fn DrawObject(pixels: &mut Vec<Pixel>,obj:&Object3d){
+fn draw_object(pixels: &mut Vec<Pixel>,obj:&Object3d){
     let vertexs = obj.normalize();
     println!("vertex: {:?}",vertexs);
     let mut triangle_to_draw:Vec<(f64,f64)> = vec![];
@@ -158,7 +157,7 @@ fn DrawObject(pixels: &mut Vec<Pixel>,obj:&Object3d){
         triangle_to_draw.push((vertexs[obj.triangles[i].0 as usize].0, vertexs[obj.triangles[i].0 as usize].1));
         triangle_to_draw.push((vertexs[obj.triangles[i].1 as usize].0, vertexs[obj.triangles[i].1 as usize].1));
         triangle_to_draw.push((vertexs[obj.triangles[i].2 as usize].0, vertexs[obj.triangles[i].2 as usize].1));
-        DrawTriangle(pixels, &triangle_to_draw, obj.color)
+        draw_triangle(pixels, &triangle_to_draw, obj.color)
     }
 }
 fn main(){
@@ -167,7 +166,7 @@ fn main(){
 
 
 
-    let mut cube:Object3d =  Object3d{
+    let cube:Object3d =  Object3d{
         vertexs: vec![
             (-1.0, -1.0, -1.0), // 0
             ( 1.0, -1.0, -1.0), // 1
@@ -203,7 +202,7 @@ fn main(){
             rotation: (0.0,0.0,0.0),
             color: (255,0,0),
         };
-    DrawObject(&mut pixels, &cube);
+    draw_object(&mut pixels, &cube);
     save_ppm(&pixels, "plik.ppm".to_string())
     
 }
