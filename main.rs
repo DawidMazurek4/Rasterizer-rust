@@ -1,4 +1,5 @@
 use std::fs::File;
+use std::fs;
 use std::io::Write;
 use std::cmp;
 
@@ -160,49 +161,53 @@ fn draw_object(pixels: &mut Vec<Pixel>,obj:&Object3d){
         draw_triangle(pixels, &triangle_to_draw, obj.color)
     }
 }
+
+fn import_obj_file(name: &str) -> (Vec<(f64,f64,f64)>, Vec<(i32,i32,i32)>) {
+    let contents = fs::read_to_string(name).unwrap();
+    let mut vertices: Vec<(f64,f64,f64)> = vec![];
+    let mut triangles: Vec<(i32,i32,i32)> = vec![];
+
+    for line in contents.lines() {
+        let mut parts = line.split_whitespace();
+        if let Some(kind) = parts.next() {
+            match kind {
+                "v" => {
+                    let nums: Vec<f64> = parts.map(|x| x.parse::<f64>().unwrap()).collect();
+                    if nums.len() == 3 {
+                        vertices.push((nums[0], nums[1], nums[2]));
+                    }
+                }
+                "f" => {
+                    let nums: Vec<i32> = parts.map(|x| x.parse::<i32>().unwrap()).collect();
+                    if nums.len() == 3 {
+                        triangles.push((nums[0]-1, nums[1]-1, nums[2]-1));
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    (vertices, triangles)
+}
 fn main(){
     let mut pixels:Vec<Pixel> = Vec::with_capacity((SCREEN_SIZE.0 * SCREEN_SIZE.1)as usize);
     pixels.resize((SCREEN_SIZE.0 * SCREEN_SIZE.1)as usize, (0,0,0));
 
 
 
-    let cube:Object3d =  Object3d{
-        vertexs: vec![
-            (-1.0, -1.0, -1.0), // 0
-            ( 1.0, -1.0, -1.0), // 1
-            ( 1.0,  1.0, -1.0), // 2
-            (-1.0,  1.0, -1.0), // 3
-            (-1.0, -1.0,  1.0), // 4
-            ( 1.0, -1.0,  1.0), // 5
-            ( 1.0,  1.0,  1.0), // 6
-            (-1.0,  1.0,  1.0), // 7
-            ],
-
-            triangles: vec![
-                // tył
-                (0, 1, 2), (0, 2, 3),
-
-                // przód
-                (4, 5, 6), (4, 6, 7),
-
-                // dół
-                (0, 1, 5), (0, 5, 4),
-
-                // góra
-                (3, 2, 6), (3, 6, 7),
-
-                // lewo
-                (0, 3, 7), (0, 7, 4),
-
-                // prawo
-                (1, 2, 6), (1, 6, 5),
-            ],
-            position: (0.8,1.0,22.0),
-            scale: (5.0,5.0,5.0),
-            rotation: (0.0,0.0,0.0),
-            color: (255,0,0),
+    let mut cube:Object3d =  Object3d{
+        vertexs: vec![],
+        triangles: vec![],
+        position: (0.8,-1.0,3.5),
+        scale: (1.0,1.0,1.0),
+        rotation: (0.0,0.0,0.0),
+        color: (255,0,0),
         };
+    
+    (cube.vertexs, cube.triangles) = import_obj_file("teapot.obj");
     draw_object(&mut pixels, &cube);
+    
     save_ppm(&pixels, "plik.ppm".to_string())
     
 }
