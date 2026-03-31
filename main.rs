@@ -97,7 +97,7 @@ fn put_pixels(pixels: &mut Vec<Pixel>,position: Vec<(i32,i32,f32)>,color: Pixel)
 
 fn orient(line: ((f64,f64),(f64,f64),(f64,f64))) -> f64{ // chcecks the orientation of a line and
                                                          // point
-    (line.1.0 - line.0.0)as f64 * (line.2.1 - line.0.1 as f64) - (line.1.1 - line.0.1)as f64*(line.2.0 - line.0.0 as f64)
+    (line.1.0 - line.0.0) * ((line.2.1 - line.0.1)) - (line.1.1 - line.0.1)*(line.2.0 - line.0.0)
 }
 
 fn point_in_triangle(triangle: &Vec<(f64,f64)>, point: (f64,f64)) -> bool{ // chcecks if a point is
@@ -138,8 +138,8 @@ fn draw_triangle(pixels: &mut Vec<Pixel>, triangle: &Vec<(f64,f64)>,color: Pixel
         min_y = 0;
     }
     
-    for i in min_y..max_y{
-        for j in min_x..max_x{
+    for i in min_y..=max_y{
+        for j in min_x..=max_x{
             if  point_in_triangle(triangle, (j as f64, i as f64)){
                 triangle_to_draw.push((j,i,1.0));
             }
@@ -199,7 +199,7 @@ fn main(){
     let mut cube:Object3d =  Object3d{
         vertexs: vec![],
         triangles: vec![],
-        position: (0.8,-1.0,3.5),
+        position: (0.4,-1.0,4.0),
         scale: (1.0,1.0,1.0),
         rotation: (0.0,0.0,0.0),
         color: (255,0,0),
