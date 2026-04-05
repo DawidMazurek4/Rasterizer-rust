@@ -55,7 +55,7 @@ impl Object3d {
             let z = z3d + self.position.2;
 
             if z <= 0.1 { // unikamy dzielenia przez 0
-                vertexs_normalized.push((0.0,0.0));
+                // vertexs_normalized.push((0.0,0.0));
                 continue;
             }
 
@@ -199,10 +199,10 @@ fn main(){
     let mut cube:Object3d =  Object3d{
         vertexs: vec![],
         triangles: vec![],
-        position: (0.4,-1.0,4.0),
+        position: (0.4,-1.0,5.0),
         scale: (1.0,1.0,1.0),
-        rotation: (0.0,0.0,0.0),
-        color: (255,0,0),
+        rotation: (0.0,90.0,0.0),
+        color: (0,200,0),
         };
     
     (cube.vertexs, cube.triangles) = import_obj_file("teapot.obj");
