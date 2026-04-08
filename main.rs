@@ -8,6 +8,17 @@ type Pixel = (u8,u8,u8,f64);
 const SCREEN_SIZE:(i32, i32) = (500,500);
 const FOV:f64 = 90.0;
 
+struct ObjFace {
+    v: i32,
+    vt: Option<i32>,
+    vn: Option<i32>,
+}
+
+struct LightSource{
+    position:(f64,f64,f64),
+    color:(u8,u8,u8),
+    power:i32,
+}
 
 struct Object3d{
     vertexs:Vec<(f64,f64,f64)>,
@@ -81,10 +92,10 @@ fn save_ppm(pixels: &Vec<Pixel>, name:String){ // saves vector of (u8,u8,u8) to 
     }
 }
 
-fn put_pixels(pixels: &mut Vec<Pixel>,position: Vec<(i32,i32,f32)>,color: (u8,u8,u8),z_pos: f64){
-    for (x,y,i) in position{
+fn put_pixels(pixels: &mut Vec<Pixel>,position: Vec<(i32,i32)>,color: (u8,u8,u8),z_pos: f64){
+    for (x,y) in position{
         if x>= 0 && x < SCREEN_SIZE.0 && y >= 0 && y < SCREEN_SIZE.1 && pixels[(x + (y * SCREEN_SIZE.0))as usize].3 < z_pos{
-            pixels[(x + (y * SCREEN_SIZE.0))as usize] = ((color.0 as f32* i)as u8,(color.1 as f32 * i)as u8,(color.2 as f32 * i)as u8,z_pos);
+            pixels[(x + (y * SCREEN_SIZE.0))as usize] = (color.0,color.1,color.2,z_pos);
         }
     }
 }
@@ -115,7 +126,7 @@ fn draw_triangle(pixels: &mut Vec<Pixel>, triangle: &Vec<(f64,f64)>,color: (u8,u
     let mut max_y = cmp::max(triangle[0].1 as i32, cmp::max(triangle[1].1 as i32, triangle[2].1 as i32))as i32;
     let mut min_x = cmp::min(triangle[0].0 as i32, cmp::min(triangle[1].0 as i32, triangle[2].0 as i32))as i32;
     let mut min_y = cmp::min(triangle[0].1 as i32, cmp::min(triangle[1].1 as i32, triangle[2].1 as i32))as i32;
-    let mut triangle_to_draw:Vec<(i32,i32,f32)> = vec![];
+    let mut triangle_to_draw:Vec<(i32,i32)> = vec![];
     
     if max_x < 0 || min_x > SCREEN_SIZE.0 || max_y < 0 || min_y > SCREEN_SIZE.1{
         return;
@@ -137,7 +148,7 @@ fn draw_triangle(pixels: &mut Vec<Pixel>, triangle: &Vec<(f64,f64)>,color: (u8,u
     for i in min_y..=max_y{
         for j in min_x..=max_x{
             if  point_in_triangle(triangle, (j as f64, i as f64)){
-                triangle_to_draw.push((j,i,1.0));
+                triangle_to_draw.push((j,i));
             }
         }
     }
@@ -145,16 +156,23 @@ fn draw_triangle(pixels: &mut Vec<Pixel>, triangle: &Vec<(f64,f64)>,color: (u8,u
     put_pixels(pixels, triangle_to_draw,color, z_pos);
     
 }
-fn draw_object(pixels: &mut Vec<Pixel>,obj:&Object3d){
+fn draw_object(pixels: &mut Vec<Pixel>, obj: &Object3d) {
     let (vertexs, z_vals) = obj.normalize();
-    let mut triangle_to_draw:Vec<(f64,f64)> = vec![];
+    let mut triangle_to_draw: Vec<(f64, f64)> = vec![];
 
-    for i in 0..obj.triangles.len(){
-        triangle_to_draw = vec![];
+    for i in 0..obj.triangles.len() {
+        triangle_to_draw.clear();
 
-        let i0 = obj.triangles[i].0 as usize;
-        let i1 = obj.triangles[i].1 as usize;
-        let i2 = obj.triangles[i].2 as usize;
+        let (i0, i1, i2) = (
+            obj.triangles[i].0 as usize,
+            obj.triangles[i].1 as usize,
+            obj.triangles[i].2 as usize,
+        );
+
+        if i0 >= vertexs.len() || i1 >= vertexs.len() || i2 >= vertexs.len() {
+            eprintln!("Skipping triangle {}: invalid vertex index", i);
+            continue;
+        }
 
         triangle_to_draw.push((vertexs[i0].0, vertexs[i0].1));
         triangle_to_draw.push((vertexs[i1].0, vertexs[i1].1));
@@ -162,14 +180,23 @@ fn draw_object(pixels: &mut Vec<Pixel>,obj:&Object3d){
 
         let z_pos = (z_vals[i0] + z_vals[i1] + z_vals[i2]) / 3.0;
 
-        draw_triangle(pixels, &triangle_to_draw, obj.color, z_pos)
+        draw_triangle(pixels, &triangle_to_draw, obj.color, z_pos);
     }
 }
 
-fn import_obj_file(name: &str) -> (Vec<(f64,f64,f64)>, Vec<(i32,i32,i32)>) {
-    let contents = fs::read_to_string(name).unwrap();
-    let mut vertices: Vec<(f64,f64,f64)> = vec![];
-    let mut triangles: Vec<(i32,i32,i32)> = vec![];
+fn import_obj_file(
+    filename: &str,
+) -> (
+    Vec<(f64, f64, f64)>,      // vertices
+    Vec<(f64, f64)>,           // textures
+    Vec<(f64, f64, f64)>,      // normals
+    Vec<(i32, i32, i32)>,      // triangles
+) {
+    let contents = fs::read_to_string(filename).unwrap();
+    let mut vertices: Vec<(f64, f64, f64)> = vec![];
+    let mut textures: Vec<(f64, f64)> = vec![];
+    let mut normals: Vec<(f64, f64, f64)> = vec![];
+    let mut faces: Vec<Vec<ObjFace>> = vec![];
 
     for line in contents.lines() {
         let mut parts = line.split_whitespace();
@@ -181,18 +208,58 @@ fn import_obj_file(name: &str) -> (Vec<(f64,f64,f64)>, Vec<(i32,i32,i32)>) {
                         vertices.push((nums[0], nums[1], nums[2]));
                     }
                 }
-                "f" => {
-                    let nums: Vec<i32> = parts.map(|x| x.parse::<i32>().unwrap()).collect();
-                    if nums.len() == 3 {
-                        triangles.push((nums[0]-1, nums[1]-1, nums[2]-1));
+                "vt" => {
+                    let nums: Vec<f64> = parts.map(|x| x.parse::<f64>().unwrap()).collect();
+                    if nums.len() >= 2 {
+                        textures.push((nums[0], nums[1]));
                     }
+                }
+                "vn" => {
+                    let nums: Vec<f64> = parts.map(|x| x.parse::<f64>().unwrap()).collect();
+                    if nums.len() == 3 {
+                        normals.push((nums[0], nums[1], nums[2]));
+                    }
+                }
+                "f" => {
+                    let face: Vec<ObjFace> = parts
+                        .map(|part| {
+                            let mut split = part.split('/');
+                            let v = split.next().unwrap().parse::<i32>().unwrap() - 1;
+                            let vt = split
+                                .next()
+                                .and_then(|s| if !s.is_empty() { s.parse::<i32>().ok().map(|n| n-1) } else { None });
+                            let vn = split
+                                .next()
+                                .and_then(|s| if !s.is_empty() { s.parse::<i32>().ok().map(|n| n-1) } else { None });
+                            ObjFace { v, vt, vn }
+                        })
+                        .collect();
+                    faces.push(face);
                 }
                 _ => {}
             }
         }
     }
 
-    (vertices, triangles)
+    // triangulate faces
+    let mut triangles: Vec<(i32, i32, i32)> = vec![];
+    for face in &faces {
+        match face.len() {
+            3 => triangles.push((face[0].v, face[1].v, face[2].v)),
+            4 => {
+                triangles.push((face[0].v, face[1].v, face[2].v));
+                triangles.push((face[0].v, face[2].v, face[3].v));
+            }
+            n if n > 4 => {
+                for i in 1..(n-1) {
+                    triangles.push((face[0].v, face[i].v, face[i+1].v));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    (vertices, textures, normals, triangles)
 }
 fn main(){
     let mut pixels:Vec<Pixel> = Vec::with_capacity((SCREEN_SIZE.0 * SCREEN_SIZE.1)as usize);
@@ -203,15 +270,16 @@ fn main(){
     let mut cube:Object3d =  Object3d{
         vertexs: vec![],
         triangles: vec![],
-        position: (0.4,-1.0,5.0),
+        position: (0.4,-1.0,50.0),
         scale: (1.0,1.0,1.0),
-        rotation: (0.0,90.0,0.0),
+        rotation: (0.0,0.0,0.0),
         color: (0,200,0),
         };
     
-    (cube.vertexs, cube.triangles) = import_obj_file("teapot.obj");
+    let (v, vt, vn, t) = import_obj_file("monkey.obj");
+    cube.vertexs = v;
+    cube.triangles = t;
     draw_object(&mut pixels, &cube);
-    
     save_ppm(&pixels, "plik.ppm".to_string())
     
 }
