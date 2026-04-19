@@ -22,6 +22,8 @@ struct LightSource{
 
 struct Object3d{
     vertexs:Vec<(f64,f64,f64)>,
+    textureinfo:Vec<(f64,f64)>,
+    normalinfo:Vec<(f64,f64,f64)>,
     triangles:Vec<(i32,i32,i32)>,
     position:(f64,f64,f64),
     rotation:(f64,f64,f64),
@@ -117,8 +119,6 @@ fn point_in_triangle(triangle: &Vec<(f64,f64)>, point: (f64,f64)) -> bool{ // ch
 }
 
 
-
-
 fn draw_triangle(pixels: &mut Vec<Pixel>, triangle: &Vec<(f64,f64)>,color: (u8,u8,u8), z_pos: f64){ // drawing a
                                                                                 // triangle
     // finding max and min values for minimum amount of iterations
@@ -156,7 +156,27 @@ fn draw_triangle(pixels: &mut Vec<Pixel>, triangle: &Vec<(f64,f64)>,color: (u8,u
     put_pixels(pixels, triangle_to_draw,color, z_pos);
     
 }
-fn draw_object(pixels: &mut Vec<Pixel>, obj: &Object3d) {
+fn cross(a:(f64,f64,f64), b:(f64,f64,f64)) -> (f64,f64,f64){
+    (
+        a.1*b.2 - a.2*b.1,
+        a.2*b.0 - a.0*b.2,
+        a.0*b.1 - a.1*b.0,
+    )
+}
+
+fn sub(a:(f64,f64,f64), b:(f64,f64,f64)) -> (f64,f64,f64){
+    (a.0-b.0, a.1-b.1, a.2-b.2)
+}
+fn normalize(v: (f64,f64,f64)) -> (f64,f64,f64){
+    let len = (v.0*v.0 + v.1*v.1 + v.2*v.2).sqrt();
+    (v.0/len, v.1/len, v.2/len)
+}
+
+fn dot(a:(f64,f64,f64), b:(f64,f64,f64)) -> f64{
+    a.0*b.0 + a.1*b.1 + a.2*b.2
+}
+fn draw_object(pixels: &mut Vec<Pixel>, obj: &Object3d, light: &LightSource) {
+
     let (vertexs, z_vals) = obj.normalize();
     let mut triangle_to_draw: Vec<(f64, f64)> = vec![];
 
@@ -170,17 +190,45 @@ fn draw_object(pixels: &mut Vec<Pixel>, obj: &Object3d) {
         );
 
         if i0 >= vertexs.len() || i1 >= vertexs.len() || i2 >= vertexs.len() {
-            eprintln!("Skipping triangle {}: invalid vertex index", i);
             continue;
         }
 
-        triangle_to_draw.push((vertexs[i0].0, vertexs[i0].1));
-        triangle_to_draw.push((vertexs[i1].0, vertexs[i1].1));
-        triangle_to_draw.push((vertexs[i2].0, vertexs[i2].1));
+        // ekranowe
+        triangle_to_draw.push(vertexs[i0]);
+        triangle_to_draw.push(vertexs[i1]);
+        triangle_to_draw.push(vertexs[i2]);
 
         let z_pos = (z_vals[i0] + z_vals[i1] + z_vals[i2]) / 3.0;
 
-        draw_triangle(pixels, &triangle_to_draw, obj.color, z_pos);
+        let p0 = obj.vertexs[i0];
+        let p1 = obj.vertexs[i1];
+        let p2 = obj.vertexs[i2];
+
+        let center = (
+            (p0.0 + p1.0 + p2.0) / 3.0,
+            (p0.1 + p1.1 + p2.1) / 3.0,
+            (p0.2 + p1.2 + p2.2) / 3.0,
+        );
+
+        let edge1 = sub(p1, p0);
+        let edge2 = sub(p2, p0);
+        let mut n = normalize(cross(edge1, edge2));
+        n = (-n.0, -n.1, -n.2);
+
+        let l = normalize((
+            light.position.0 - center.0,
+            light.position.1 - center.1,
+            light.position.2 - center.2,
+        ));
+        let intensity = (0.2 + dot(n, l).max(0.0)).min(1.0);
+
+        let new_color = (
+            (((obj.color.0 as f64 / 255.0) * (0.2 + light.color.0 as f64 / 255.0 * intensity)) * 255.0) as u8,
+            (((obj.color.1 as f64 / 255.0) * (0.2 + light.color.1 as f64 / 255.0 * intensity)) * 255.0) as u8,
+            (((obj.color.2 as f64 / 255.0) * (0.2 + light.color.2 as f64 / 255.0 * intensity)) * 255.0) as u8,
+        );
+
+        draw_triangle(pixels, &triangle_to_draw, new_color, z_pos);
     }
 }
 
@@ -265,21 +313,32 @@ fn main(){
     let mut pixels:Vec<Pixel> = Vec::with_capacity((SCREEN_SIZE.0 * SCREEN_SIZE.1)as usize);
     pixels.resize((SCREEN_SIZE.0 * SCREEN_SIZE.1)as usize, (0,0,0,0.0));
 
+    let light = LightSource{
+        position: (0.0, 5.0, 5.0),
+        color: (255,0,0),
+        power: 2,
+    };
+
 
 
     let mut cube:Object3d =  Object3d{
         vertexs: vec![],
+        normalinfo: vec![],
+        textureinfo: vec![],
         triangles: vec![],
-        position: (0.4,-1.0,50.0),
+        position: (0.4,-1.0,20.0),
         scale: (1.0,1.0,1.0),
-        rotation: (0.0,0.0,0.0),
-        color: (0,200,0),
+        rotation: (0.0,0.0,30.0),
+        color: (255,255,255),
         };
     
     let (v, vt, vn, t) = import_obj_file("monkey.obj");
+    println!("{:?}",vn);
     cube.vertexs = v;
+    cube.textureinfo = vt;
+    cube.normalinfo = vn;
     cube.triangles = t;
-    draw_object(&mut pixels, &cube);
+    draw_object(&mut pixels, &cube, &light);
     save_ppm(&pixels, "plik.ppm".to_string())
     
 }
