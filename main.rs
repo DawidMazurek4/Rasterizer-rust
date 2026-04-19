@@ -200,7 +200,6 @@ fn draw_object(pixels: &mut Vec<Pixel>, obj: &Object3d, light: &LightSource) {
 
         let z_pos = (z_vals[i0] + z_vals[i1] + z_vals[i2]) / 3.0;
 
-        // 🔹 środek trójkąta w 3D (WAŻNE)
         let p0 = obj.vertexs[i0];
         let p1 = obj.vertexs[i1];
         let p2 = obj.vertexs[i2];
@@ -211,26 +210,22 @@ fn draw_object(pixels: &mut Vec<Pixel>, obj: &Object3d, light: &LightSource) {
             (p0.2 + p1.2 + p2.2) / 3.0,
         );
 
-        // 🔹 normalna (tu uproszczenie — bierzesz jedną)
         let edge1 = sub(p1, p0);
         let edge2 = sub(p2, p0);
-        let n = normalize(cross(edge1, edge2));
+        let mut n = normalize(cross(edge1, edge2));
+        n = (-n.0, -n.1, -n.2);
 
-        // 🔹 wektor światła
         let l = normalize((
             light.position.0 - center.0,
             light.position.1 - center.1,
             light.position.2 - center.2,
         ));
+        let intensity = (0.2 + dot(n, l).max(0.0)).min(1.0);
 
-        // 🔹 intensity
-        let intensity = dot(n, l).max(0.0) * light.power as f64;
-
-        // 🔹 kolor
         let new_color = (
-            (obj.color.0 as f64 * intensity) as u8,
-            (obj.color.1 as f64 * intensity) as u8,
-            (obj.color.2 as f64 * intensity) as u8,
+            (((obj.color.0 as f64 / 255.0) * (0.2 + light.color.0 as f64 / 255.0 * intensity)) * 255.0) as u8,
+            (((obj.color.1 as f64 / 255.0) * (0.2 + light.color.1 as f64 / 255.0 * intensity)) * 255.0) as u8,
+            (((obj.color.2 as f64 / 255.0) * (0.2 + light.color.2 as f64 / 255.0 * intensity)) * 255.0) as u8,
         );
 
         draw_triangle(pixels, &triangle_to_draw, new_color, z_pos);
@@ -319,9 +314,9 @@ fn main(){
     pixels.resize((SCREEN_SIZE.0 * SCREEN_SIZE.1)as usize, (0,0,0,0.0));
 
     let light = LightSource{
-        position: (0.0, 0.0, 10.0),
+        position: (0.0, 5.0, 5.0),
         color: (255,0,0),
-        power: 1,
+        power: 2,
     };
 
 
@@ -334,7 +329,7 @@ fn main(){
         position: (0.4,-1.0,20.0),
         scale: (1.0,1.0,1.0),
         rotation: (0.0,0.0,30.0),
-        color: (0,200,0),
+        color: (255,255,255),
         };
     
     let (v, vt, vn, t) = import_obj_file("monkey.obj");
